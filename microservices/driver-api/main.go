@@ -1,38 +1,46 @@
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"time"
+
+	"github.com/rusdiyanto82/my-lessons/microservices/driver-api/handlers"
 )
 
 func main() {
-	//request to the path /goodbye will be handled by this function
-	http.HandleFunc("/goodbye", func(rw http.ResponseWriter, r *http.Request) {
-		log.Println("running goodbye handler")
-		fmt.Fprintf(rw, "goodbye")
-	})
+	l := log.New(os.Stdout, "driver-api", log.LstdFlags)
+	dr := handlers.NewDriver(l)
 
-	//any other request will be handled by this function
-	http.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
-		log.Println("running hello handler")
+	sm := http.NewServeMux()
+	sm.Handle("/", dr)
 
-		//read the body
-		b, err := ioutil.ReadAll(r.Body)
+	s := &http.Server{
+		Addr:         ":9090",
+		Handler:      sm,
+		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  1 * time.Second,
+		WriteTimeout: 1 * time.Second,
+	}
+
+	go func() {
+		l.Println("Starting server on port 9090")
+		err := s.ListenAndServe()
 		if err != nil {
-			log.Println("error reading body", err)
-			http.Error(rw, "unable to read request body", http.StatusBadRequest)
-			return
+			l.Fatal(err)
 		}
+	}()
 
-		//write the response
-		fmt.Fprintf(rw, "hello %s", b)
-	})
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan, os.Interrupt)
+	signal.Notify(sigChan, os.Kill)
 
-	//listen for connection on all ip address (0.0.0.0)
-	//port 9090
-	log.Println("starting server")
-	err := http.ListenAndServe(":9090", nil)
-	log.Fatal(err)
+	sig := <-sigChan
+	l.Println("Received terminate, graceful shutdown", sig)
+
+	tc, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	s.Shutdown(tc)
 }

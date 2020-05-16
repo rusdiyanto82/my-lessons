@@ -31,13 +31,13 @@ func (d *Drivers) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 //getDrivers return the drivers from the data
 func (d *Drivers) getDrivers(rw http.ResponseWriter, r *http.Request) {
-	p.l.Println("Handle GET Drivers")
+	d.l.Println("Handle GET Drivers")
 
 	//fetch the drivers from the data
 	dr := data.GetDrivers()
 
 	//serialize the list to Json
-	err := dr.ToJson(rw)
+	err := dr.ToJSON(rw)
 	if err != nil {
 		http.Error(rw, "Unable to marshal json", http.StatusInternalServerError)
 	}
